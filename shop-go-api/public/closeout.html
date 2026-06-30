@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shop & Go — Shift Closeout</title>
+<style>
+  body { font-family: -apple-system, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 16px; background: #f4f4f4; color: #111; }
+  h1 { font-size: 20px; margin: 8px 0; }
+  .sub { color: #555; font-size: 13px; margin-bottom: 16px; }
+  .card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  label { display: block; font-size: 14px; margin: 10px 0 4px; font-weight: 600; }
+  .hint { font-weight: 400; color: #888; font-size: 12px; }
+  input, select { width: 100%; font-size: 20px; padding: 10px; border: 2px solid #ccc; border-radius: 8px; box-sizing: border-box; }
+  input:focus, select:focus { border-color: #2a7; outline: none; }
+  .two { display: flex; gap: 10px; }
+  .two > div { flex: 1; }
+  .grp { background:#f7f9fb; border:1px solid #e3e8ee; border-radius:8px; padding:10px; margin-top:8px; }
+  .grp .t { font-size:13px; font-weight:600; color:#456; margin-bottom:4px; }
+  .row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 15px; border-bottom: 1px solid #eee; }
+  .row b { font-size: 16px; }
+  .row .sub-row { font-size: 13px; color: #888; padding-left: 12px; }
+  .res { background:#eef4ee; }
+  .big { font-size: 28px; font-weight: 700; text-align: center; padding: 16px; border-radius: 10px; margin-top: 8px; }
+  .ok { background: #e3f5e8; color: #137a36; }
+  .over { background: #e6f0fb; color: #14538a; }
+  .short { background: #fbe6e6; color: #a32020; }
+  button { width: 100%; font-size: 16px; padding: 14px; margin-top: 8px; border: 0; border-radius: 8px; background: #2a7; color: #fff; font-weight: 600; }
+  .save { background: #1b6; }
+  .clear { background: #999; }
+  .hist { font-size: 13px; width:100%; }
+  .hist th, .hist td { text-align: left; padding: 5px 6px; border-bottom: 1px solid #eee; }
+  .hist .s { color: #a32020; font-weight: 700; }
+  .hist .o { color: #14538a; font-weight: 700; }
+  .hist .b { color: #137a36; font-weight: 700; }
+  .card-inline { display:flex; justify-content:space-between; align-items:center; background:#f0f4ff; border-radius:6px; padding:6px 10px; margin-top:6px; font-size:14px; }
+  .card-inline b { font-size:15px; }
+</style>
+</head>
+<body>
+<h1>Shop &amp; Go — Shift Closeout</h1>
+<div class="sub">Fill the boxes, tap SAVE — it stamps the date and keeps a history.</div>
+
+<div class="card">
+  <div class="two">
+    <div><label>Date</label><input id="date" type="date"></div>
+    <div><label>Shift</label>
+      <select id="shift">
+        <option>First Shift</option>
+        <option>Second Shift</option>
+        <option>Third Shift</option>
+      </select>
+    </div>
+  </div>
+
+  <label>Final shift of the business day?</label>
+  <select id="finalshift">
+    <option value="no">No — sync this shift only</option>
+    <option value="yes">Yes — sync cumulative (all shifts today)</option>
+  </select>
+
+  <label>Who closed</label>
+  <input id="who" type="text" placeholder="employee name">
+
+  <label>Net sale <span class="hint">(Clover total sales)</span></label>
+  <input id="netsale" type="number" inputmode="decimal" placeholder="0.00">
+
+  <label>Lottery rung up on register <span class="hint">(usually 0)</span></label>
+  <input id="lottoreg" type="number" inputmode="decimal" placeholder="0.00">
+
+  <label>Debit card <span class="hint">(from Clover)</span></label>
+  <input id="debit" type="number" inputmode="decimal" placeholder="0.00">
+
+  <label>Credit card <span class="hint">(from Clover)</span></label>
+  <input id="credit" type="number" inputmode="decimal" placeholder="0.00">
+
+  <div class="card-inline">
+    <span>Total card sales</span><b id="o_totalcard">$0.00</b>
+  </div>
+
+  <div class="grp">
+    <div class="t">Lottery Money Drop</div>
+    <div id="lotto_status" style="font-size:13px;padding:6px 0;color:#888;">Syncing lottery…</div>
+    <button type="button" onclick="syncLottery()" style="background:#1b6;font-size:14px;padding:8px;margin:0 0 8px;">↻ Sync lottery now</button>
+    <label>Money Drop <span class="hint">(auto-fills from RTN — or type it; accepts negative values)</span></label>
+    <input id="moneydrop" type="number" step="0.01" placeholder="0.00">
+    <div class="t" style="margin-top:10px;color:#888;">Optional breakdown (RTN already did the math above)</div>
+    <label>Instant ticket sale <span class="hint">(optional)</span></label>
+    <input id="instsale" type="number" inputmode="decimal" placeholder="0.00">
+    <label>Online / machine sale <span class="hint">(optional)</span></label>
+    <input id="machsale" type="number" inputmode="decimal" placeholder="0.00">
+    <label>Instant payout <span class="hint">(optional)</span></label>
+    <input id="instpay" type="number" inputmode="decimal" placeholder="0.00">
+    <label>Online payout <span class="hint">(optional)</span></label>
+    <input id="offpay" type="number" inputmode="decimal" placeholder="0.00">
+  </div>
+
+  <div class="grp">
+    <div class="t">Cash Payouts <span class="hint">(receipts in drawer — note what each was for)</span></div>
+    <div class="two"><input id="paynote1" type="text" placeholder="what for? (e.g. bread)"><input id="payamt1" type="number" inputmode="decimal" placeholder="0.00"></div>
+    <div class="two" style="margin-top:6px;"><input id="paynote2" type="text" placeholder="what for?"><input id="payamt2" type="number" inputmode="decimal" placeholder="0.00"></div>
+    <div class="two" style="margin-top:6px;"><input id="paynote3" type="text" placeholder="what for?"><input id="payamt3" type="number" inputmode="decimal" placeholder="0.00"></div>
+    <div class="two" style="margin-top:6px;"><input id="paynote4" type="text" placeholder="what for?"><input id="payamt4" type="number" inputmode="decimal" placeholder="0.00"></div>
+    <div class="two" style="margin-top:6px;"><input id="paynote5" type="text" placeholder="what for?"><input id="payamt5" type="number" inputmode="decimal" placeholder="0.00"></div>
+    <div class="two" style="margin-top:6px;"><input id="paynote6" type="text" placeholder="what for?"><input id="payamt6" type="number" inputmode="decimal" placeholder="0.00"></div>
+    <div class="two" style="margin-top:6px;"><input id="paynote7" type="text" placeholder="what for?"><input id="payamt7" type="number" inputmode="decimal" placeholder="0.00"></div>
+    <div class="two" style="margin-top:6px;"><input id="paynote8" type="text" placeholder="what for?"><input id="payamt8" type="number" inputmode="decimal" placeholder="0.00"></div>
+  </div>
+
+  <div class="grp">
+    <div class="t">Non-Cash Payouts <span class="hint">(paid by card or owner — does NOT affect cash count)</span></div>
+    <div class="two"><input id="ncnote1" type="text" placeholder="what for?"><input id="ncamt1" type="number" inputmode="decimal" placeholder="0.00"></div>
+    <div class="two" style="margin-top:6px;"><input id="ncnote2" type="text" placeholder="what for?"><input id="ncamt2" type="number" inputmode="decimal" placeholder="0.00"></div>
+    <div class="two" style="margin-top:6px;"><input id="ncnote3" type="text" placeholder="what for?"><input id="ncamt3" type="number" inputmode="decimal" placeholder="0.00"></div>
+    <div class="two" style="margin-top:6px;"><input id="ncnote4" type="text" placeholder="what for?"><input id="ncamt4" type="number" inputmode="decimal" placeholder="0.00"></div>
+  </div>
+
+  <label>Opening float <span class="hint">(same every shift)</span></label>
+  <input id="float" type="number" inputmode="decimal" placeholder="100.00">
+
+  <label>Drop <span class="hint">(count the cash in the register now — accepts negative)</span></label>
+  <input id="counted" type="number" step="0.01" placeholder="0.00">
+</div>
+
+<div class="card">
+  <div class="row"><span>Net sale</span><b id="o_net">$0.00</b></div>
+  <div class="row"><span>− Lottery rung on register</span><b id="o_lottoreg">$0.00</b></div>
+  <div class="row res"><span><b>= Actual net sale</b></span><b id="o_actualnet">$0.00</b></div>
+  <div class="row"><span>− Debit card</span><b id="o_debit">$0.00</b></div>
+  <div class="row"><span>− Credit card</span><b id="o_credit">$0.00</b></div>
+  <div class="row res"><span><b>= Cash from sale</b></span><b id="o_daycash">$0.00</b></div>
+  <div class="row"><span>+ Lottery Money Drop <span class="hint">(from RTN)</span></span><b id="o_drop">$0.00</b></div>
+  <div class="row"><span>− Cash payouts</span><b id="o_pay">$0.00</b></div>
+  <div class="row res"><span><b>= Cash we should have</b></span><b id="o_expected">$0.00</b></div>
+  <div class="row"><span>Counted − float</span><b id="o_actual">$0.00</b></div>
+  <div id="result" class="big ok">OVER / SHORT: $0.00</div>
+</div>
+
+<button class="save" onclick="saveRecord()">Save this shift</button>
+<button onclick="window.print()">Print / Save PDF</button>
+<button class="clear" onclick="clearForm()">Clear boxes</button>
+
+<div class="card">
+  <h1 style="font-size:16px;">History</h1>
+  <div class="sub" style="margin:0;">Saved on this device. Tap a row to reload it.</div>
+  <table class="hist"><thead><tr><th>Date</th><th>Shift</th><th>Who</th><th>Sale</th><th>Over/Short</th></tr></thead>
+  <tbody id="histbody"></tbody></table>
+  <button class="clear" style="font-size:13px;padding:8px;" onclick="exportCSV()">Export history to CSV</button>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const v = id => parseFloat($(id).value) || 0;
+  const money = n => '$' + Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const KEY = 'shopgo_closeouts';
+  function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+  function calc(){
+    const net=v('netsale'), lottoreg=v('lottoreg'),
+          debit=v('debit'), credit=v('credit'), card=debit+credit,
+          moneydrop=v('moneydrop'), instsale=v('instsale'), machsale=v('machsale'),
+          instpay=v('instpay'), offpay=v('offpay'),
+          pay=v('payamt1')+v('payamt2')+v('payamt3')+v('payamt4')+v('payamt5')+v('payamt6')+v('payamt7')+v('payamt8'),
+          flt=v('float'), counted=v('counted');
+    const actualNet = net - lottoreg;
+    const dayCash = actualNet - card;
+    const drop = moneydrop !== 0 ? moneydrop : (instsale + machsale - instpay + offpay);
+    const expected = dayCash + drop - pay;
+    const actual = counted - flt;
+    const diff = actual - expected;
+    $('o_totalcard').textContent = money(card);
+    $('o_net').textContent=money(net);
+    $('o_lottoreg').textContent='-'+money(lottoreg);
+    $('o_actualnet').textContent=money(actualNet);
+    $('o_debit').textContent='-'+money(debit);
+    $('o_credit').textContent='-'+money(credit);
+    $('o_daycash').textContent=money(dayCash);
+    $('o_drop').textContent=(drop<0?'-':'+')+''+money(drop);
+    $('o_pay').textContent='-'+money(pay);
+    $('o_expected').textContent=money(expected);
+    $('o_actual').textContent=money(actual);
+    const r=$('result');
+    if(Math.abs(diff)<0.005){ r.className='big ok'; r.textContent='BALANCED: $0.00'; }
+    else if(diff>0){ r.className='big over'; r.textContent='OVER by '+money(diff); }
+    else { r.className='big short'; r.textContent='SHORT by '+money(-diff)+'  — recount, then text owner'; }
+    return {diff, expected, drop, dayCash, card, debit, credit};
+  }
+
+  function load(){ try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch(e){ return []; } }
+  function render(){
+    const rows = load().slice().reverse();
+    $('histbody').innerHTML = rows.map(r=>{
+      const cls = Math.abs(r.diff)<0.005?'b':(r.diff>0?'o':'s');
+      const txt = Math.abs(r.diff)<0.005?'OK':(r.diff>0?'+'+money(r.diff):money(r.diff));
+      return `<tr onclick='reload(${JSON.stringify(JSON.stringify(r))})'><td>${r.date}</td><td>${r.shift}</td><td>${r.who||''}</td><td>${money(r.netsale)}</td><td class="${cls}">${txt}</td></tr>`;
+    }).join('');
+  }
+  function saveRecord(){
+    const c = calc();
+    const rec = {
+      date:$('date').value||todayStr(), shift:$('shift').value,
+      finalshift:$('finalshift').value, who:$('who').value,
+      netsale:v('netsale'), lottoreg:v('lottoreg'),
+      debit:v('debit'), credit:v('credit'), card:c.card,
+      moneydrop:v('moneydrop'), instsale:v('instsale'), machsale:v('machsale'),
+      instpay:v('instpay'), offpay:v('offpay'),
+      payamt1:v('payamt1'), paynote1:$('paynote1').value, payamt2:v('payamt2'), paynote2:$('paynote2').value,
+      payamt3:v('payamt3'), paynote3:$('paynote3').value, payamt4:v('payamt4'), paynote4:$('paynote4').value,
+      payamt5:v('payamt5'), paynote5:$('paynote5').value, payamt6:v('payamt6'), paynote6:$('paynote6').value,
+      payamt7:v('payamt7'), paynote7:$('paynote7').value, payamt8:v('payamt8'), paynote8:$('paynote8').value,
+      payouts:v('payamt1')+v('payamt2')+v('payamt3')+v('payamt4')+v('payamt5')+v('payamt6')+v('payamt7')+v('payamt8'),
+      ncamt1:v('ncamt1'), ncnote1:$('ncnote1').value, ncamt2:v('ncamt2'), ncnote2:$('ncnote2').value,
+      ncamt3:v('ncamt3'), ncnote3:$('ncnote3').value, ncamt4:v('ncamt4'), ncnote4:$('ncnote4').value,
+      ncpayouts:v('ncamt1')+v('ncamt2')+v('ncamt3')+v('ncamt4'),
+      float:v('float'), counted:v('counted'),
+      drop:c.drop, expected:c.expected, diff:c.diff, savedAt:new Date().toISOString()
+    };
+    const all = load(); all.push(rec); localStorage.setItem(KEY, JSON.stringify(all));
+    render();
+    const SAVE_URL = "https://shop-go-api.vercel.app/api/save";
+    fetch(SAVE_URL, {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(Object.assign({key:"OCRrmjwVbJYuu1ZfTqMihoP31fCf3kFt"}, rec))})
+      .then(r=>r.json())
+      .then(j=> alert('Saved '+rec.date+' '+rec.shift+
+        (Math.abs(c.diff)<0.005?' — balanced':(c.diff>0?' — over '+money(c.diff):' — SHORT '+money(-c.diff)))+
+        (j && j.ok ? '\n\nEmailed to owner + brother.' : '\n\n(saved on phone; email did not send)')))
+      .catch(()=> alert('Saved on phone: '+rec.date+' '+rec.shift+
+        '\n\n(no internet — email will not send; export CSV as backup)'));
+  }
+  function reload(s){ const r=JSON.parse(s);
+    ['date','shift','finalshift','who','netsale','lottoreg','debit','credit','moneydrop','instsale','machsale','instpay','offpay',
+     'payamt1','paynote1','payamt2','paynote2','payamt3','paynote3','payamt4','paynote4',
+     'payamt5','paynote5','payamt6','paynote6','payamt7','paynote7','payamt8','paynote8',
+     'ncamt1','ncnote1','ncamt2','ncnote2','ncamt3','ncnote3','ncamt4','ncnote4','float','counted']
+    .forEach(k=>{ if($(k)&&r[k]!==undefined) $(k).value=r[k]; });
+    calc(); window.scrollTo(0,0);
+  }
+  function clearForm(){
+    ['who','netsale','lottoreg','debit','credit','moneydrop','instsale','machsale','instpay','offpay',
+     'payamt1','paynote1','payamt2','paynote2','payamt3','paynote3','payamt4','paynote4',
+     'payamt5','paynote5','payamt6','paynote6','payamt7','paynote7','payamt8','paynote8',
+     'ncamt1','ncnote1','ncamt2','ncnote2','ncamt3','ncnote3','ncamt4','ncnote4','counted']
+    .forEach(k=>{ const el=$(k); if(el) el.value=''; });
+    $('date').value=todayStr(); $('shift').value='First Shift'; $('finalshift').value='no';
+    calc();
+  }
+  function exportCSV(){
+    const all=load(); if(!all.length){ alert('No saved shifts yet.'); return; }
+    const q=s=>'"'+String(s||'').replace(/"/g,'""')+'"';
+    const head=['date','shift','final_shift','who','net_sale','lottery_on_register','debit_card','credit_card','total_card','money_drop','lottery_drop_used','payouts_total','float','drop_counted','cash_should_have','over_short'];
+    const lines=[head.join(',')].concat(all.map(r=>[r.date,r.shift,r.finalshift||'',q(r.who),r.netsale,r.lottoreg,(r.debit||0),(r.credit||0),(r.card||0),(r.moneydrop||0),(r.drop||0).toFixed(2),(r.payouts||0),r.float,r.counted,(r.expected||0).toFixed(2),(r.diff||0).toFixed(2)].join(',')));
+    const blob=new Blob([lines.join('\n')],{type:'text/csv'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='shop-go-closeouts.csv'; a.click();
+  }
+
+  const DROP_KEY = "OCRrmjwVbJYuu1ZfTqMihoP31fCf3kFt";
+  const DROP_BASE = "https://shop-go-api.vercel.app/api/drop?key=" + DROP_KEY;
+  async function syncLottery(){
+    const st = $('lotto_status');
+    st.textContent = 'Syncing lottery…'; st.style.color = '#888';
+    const isFinal = $('finalshift').value === 'yes';
+    const url = isFinal ? DROP_BASE + '&cumulative=true' : DROP_BASE;
+    try {
+      const r = await fetch(url, {cache:'no-store'});
+      const d = await r.json();
+      if (d && d.money_drop != null) {
+        $('moneydrop').value = d.money_drop;
+        if (!d.cumulative) {
+          if (d.instant_sales   != null) $('instsale').value = d.instant_sales;
+          if (d.online_sales    != null) $('machsale').value = d.online_sales;
+          if (d.instant_cashout != null) $('instpay').value  = d.instant_cashout;
+          if (d.online_cashout  != null) $('offpay').value   = d.online_cashout;
+          st.textContent = `✓ Shift ${d.shift} only · closed ${d.close} · Drop $${d.money_drop}`;
+        } else {
+          st.textContent = `✓ Daily total — ${d.shifts_included?.length||'all'} shifts today · Total Drop $${d.money_drop}`;
+        }
+        st.style.color = '#137a36';
+        calc();
+      } else {
+        st.textContent = 'No lottery report yet — close the shift in the lottery terminal, wait a minute, tap Sync again. Or type Drop manually.';
+        st.style.color = '#a32020';
+      }
+    } catch(e) {
+      st.textContent = 'Lottery sync failed (no internet?) — type Money Drop from the RTN email.';
+      st.style.color = '#a32020';
+    }
+  }
+
+  document.querySelectorAll('input,select').forEach(i=>i.addEventListener('input',calc));
+  $('date').value = todayStr();
+  render(); calc();
+  syncLottery();
+</script>
+</body>
+</html>

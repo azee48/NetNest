@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shop & Go — Weekly Domebook</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, Helvetica, Arial, sans-serif; background: #f2f2f7; color: #111; font-size: 14px; }
+
+header { background: #1c1c1e; color: #fff; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+header h1 { font-size: 16px; font-weight: 700; }
+header .sub { font-size: 12px; color: #888; margin-top: 1px; }
+
+.week-nav { display: flex; align-items: center; gap: 8px; }
+.week-nav button { background: #2c2c2e; border: 1px solid #444; color: #fff; border-radius: 6px; padding: 5px 10px; font-size: 13px; cursor: pointer; }
+.week-nav button:active { background: #3a3a3c; }
+#week-label { font-size: 13px; color: #ccc; min-width: 160px; text-align: center; }
+
+.actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 10px 16px; background: #fff; border-bottom: 1px solid #e0e0e0; }
+.actions button { border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn-save  { background: #34c759; color: #fff; }
+.btn-print { background: #636366; color: #fff; }
+.btn-clear { background: #ff3b30; color: #fff; }
+
+.scroll-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+table { width: 100%; border-collapse: collapse; min-width: 900px; background: #fff; }
+thead th { background: #1c1c1e; color: #fff; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 8px 6px; text-align: center; border-right: 1px solid #333; white-space: nowrap; }
+thead th:first-child { text-align: left; padding-left: 10px; min-width: 70px; }
+thead .col-calc { background: #2c2c2e; }
+thead .col-result { background: #1a3a1a; }
+thead .col-os { background: #3a1a1a; }
+
+tbody tr { border-bottom: 1px solid #e8e8e8; }
+tbody tr:hover { background: #f9f9f9; }
+tbody tr.totals-row { background: #f0f0f0; border-top: 2px solid #333; }
+tbody tr.totals-row td { font-weight: 700; font-size: 13px; }
+
+td { padding: 4px 4px; border-right: 1px solid #ebebeb; vertical-align: middle; }
+td:first-child { padding-left: 10px; font-weight: 600; font-size: 13px; white-space: nowrap; }
+td.calc { background: #f6fef6; }
+td.result { background: #e8f5e8; font-weight: 700; }
+td.os-ok   { background: #e8f5e8; color: #1a7a1a; font-weight: 700; text-align: center; }
+td.os-over { background: #e8f0fb; color: #14538a; font-weight: 700; text-align: center; }
+td.os-short { background: #fbe8e8; color: #a32020; font-weight: 700; text-align: center; }
+td.os-blank { text-align: center; color: #bbb; }
+
+input[type=number], input[type=text] { border: 1px solid #ddd; border-radius: 5px; padding: 4px 5px; font-size: 13px; width: 82px; text-align: right; background: #fff; color: #111; -moz-appearance: textfield; }
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+input[type=number]:focus, input[type=text]:focus { border-color: #34c759; outline: none; }
+input.notes-in { width: 110px; text-align: left; }
+
+.section { background: #fff; margin: 12px 16px; border-radius: 10px; border: 1px solid #e0e0e0; overflow: hidden; }
+.section-head { background: #1c1c1e; color: #fff; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 8px 12px; }
+.section-body { padding: 10px 12px; }
+
+.payout-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 600px) { .payout-grid { grid-template-columns: 1fr; } }
+.payout-day { font-size: 12px; }
+.payout-day .day-label { font-weight: 700; color: #333; margin-bottom: 4px; }
+.payout-entry { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px solid #f0f0f0; color: #444; }
+.payout-entry .amt { font-weight: 600; color: #111; }
+
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; padding: 10px 16px 16px; }
+.stat { background: #fff; border-radius: 8px; border: 1px solid #e0e0e0; padding: 10px 12px; }
+.stat .label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px; }
+.stat .val { font-size: 22px; font-weight: 700; color: #111; }
+.stat.green .val { color: #1a7a1a; }
+.stat.blue  .val { color: #14538a; }
+.stat.red   .val { color: #a32020; }
+.stat.gold  .val { color: #8a6000; }
+
+footer { text-align: center; color: #aaa; font-size: 11px; padding: 20px; }
+
+@media print {
+  header .week-nav, .actions, .btn-save, .btn-clear, .btn-print { display: none !important; }
+  body { background: #fff; font-size: 12px; }
+  table { min-width: auto; font-size: 11px; }
+  thead th { font-size: 10px; }
+  input[type=number], input[type=text] { border: none; background: transparent; font-size: 11px; width: auto; }
+  .section, .stat { border: 1px solid #ccc; }
+  .summary-grid { grid-template-columns: repeat(5, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="h1">Shop &amp; Go Liquors</div>
+    <div class="sub">Weekly Domebook</div>
+  </div>
+  <div class="week-nav">
+    <button onclick="changeWeek(-1)">&#8592;</button>
+    <div id="week-label">—</div>
+    <button onclick="changeWeek(+1)">&#8594;</button>
+  </div>
+</header>
+
+<div class="actions">
+  <button class="btn-save"  onclick="saveWeek()">Save this week</button>
+  <button class="btn-print" onclick="window.print()">Print / PDF</button>
+  <button class="btn-clear" onclick="clearWeek()">Clear</button>
+</div>
+
+<div class="scroll-wrap">
+<table id="ledger">
+<thead>
+<tr>
+  <th rowspan="2" style="min-width:70px">Day</th>
+  <th rowspan="2">Clover<br>Net Sale</th>
+  <th rowspan="2" class="col-calc">− Lottery<br>on Reg</th>
+  <th rowspan="2" class="col-calc">− Card<br>Sales</th>
+  <th rowspan="2" class="col-result">= Cash<br>from Sale</th>
+  <th rowspan="2">+ Lottery<br>Drop</th>
+  <th rowspan="2" class="col-calc">− Cash<br>Payouts</th>
+  <th rowspan="2" class="col-result">= Cash<br>Expected</th>
+  <th rowspan="2">Counted<br>(−float)</th>
+  <th rowspan="2" class="col-os">Over/<br>Short</th>
+  <th rowspan="2">Notes</th>
+</tr>
+</thead>
+<tbody id="tbody"></tbody>
+</table>
+</div>
+
+<div class="summary-grid" id="summary"></div>
+
+<div class="section">
+  <div class="section-head">Cash payouts detail — this week</div>
+  <div class="section-body" id="cash-payouts-detail"><span style="color:#aaa;font-size:13px;">No cash payouts entered.</span></div>
+</div>
+
+<div class="section">
+  <div class="section-head">Non-cash payouts detail — this week</div>
+  <div class="section-body" id="nc-payouts-detail"><span style="color:#aaa;font-size:13px;">No non-cash payouts entered.</span></div>
+</div>
+
+<footer>Shop &amp; Go Liquors · 915 Main St, Holyoke MA</footer>
+
+<script>
+const DAYS  = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const SHORT = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const $ = id => document.getElementById(id);
+const money = n => '$' + (isNaN(n) ? '0.00' : Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}));
+const v = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
+const sv = id => { const el = document.getElementById(id); return el ? (el.value || '') : ''; };
+
+let currentMonday = getMonday(new Date());
+
+function getMonday(d) {
+  const day = d.getDay();
+  const diff = (day === 0 ? -6 : 1 - day);
+  const m = new Date(d);
+  m.setDate(d.getDate() + diff);
+  m.setHours(0,0,0,0);
+  return m;
+}
+function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate()+n); return r; }
+function fmtDate(d) { return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+function fmtISO(d) { return d.toISOString().slice(0,10); }
+function weekKey(mon) { return 'domebook_' + fmtISO(mon); }
+
+function changeWeek(n) {
+  currentMonday = addDays(currentMonday, n * 7);
+  buildTable();
+  loadWeek();
+}
+
+function buildTable() {
+  const sun = addDays(currentMonday, 6);
+  $('week-label').textContent = fmtDate(currentMonday) + ' – ' + fmtDate(sun);
+
+  const tbody = $('tbody');
+  tbody.innerHTML = '';
+
+  for (let i = 0; i < 7; i++) {
+    const date = addDays(currentMonday, i);
+    const d = SHORT[i];
+    const dateStr = fmtDate(date);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><b>${d}</b><br><span style="font-size:11px;color:#888">${dateStr}</span></td>
+      <td><input type="number" id="${d}_net"      inputmode="decimal" placeholder="0.00" oninput="calc('${d}')"></td>
+      <td><input type="number" id="${d}_lottoreg" inputmode="decimal" placeholder="0.00" oninput="calc('${d}')"></td>
+      <td><input type="number" id="${d}_card"     inputmode="decimal" placeholder="0.00" oninput="calc('${d}')"></td>
+      <td class="calc" id="${d}_cashsale">$0.00</td>
+      <td><input type="number" id="${d}_drop"     inputmode="decimal" placeholder="0.00" oninput="calc('${d}')"></td>
+      <td><input type="number" id="${d}_payouts"  inputmode="decimal" placeholder="0.00" oninput="calc('${d}')"></td>
+      <td class="result" id="${d}_expected">$0.00</td>
+      <td><input type="number" id="${d}_counted"  inputmode="decimal" placeholder="0.00" oninput="calc('${d}')"></td>
+      <td class="os-blank" id="${d}_os">—</td>
+      <td><input type="text"   id="${d}_notes"    class="notes-in" placeholder="notes..."></td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  const totRow = document.createElement('tr');
+  totRow.className = 'totals-row';
+  totRow.innerHTML = `
+    <td>WEEK TOTAL</td>
+    <td id="TOT_net" style="text-align:right">$0.00</td>
+    <td id="TOT_lottoreg" style="text-align:right;color:#888">$0.00</td>
+    <td id="TOT_card" style="text-align:right;color:#888">$0.00</td>
+    <td class="calc" id="TOT_cashsale">$0.00</td>
+    <td id="TOT_drop" style="text-align:right">$0.00</td>
+    <td id="TOT_payouts" style="text-align:right;color:#888">$0.00</td>
+    <td class="result" id="TOT_expected">$0.00</td>
+    <td id="TOT_counted" style="text-align:right;color:#888">$0.00</td>
+    <td id="TOT_os" style="text-align:center">—</td>
+    <td></td>
+  `;
+  tbody.appendChild(totRow);
+
+  calcAll();
+}
+
+function calc(d) {
+  const net      = v(d+'_net');
+  const lottoreg = v(d+'_lottoreg');
+  const card     = v(d+'_card');
+  const drop     = v(d+'_drop');
+  const payouts  = v(d+'_payouts');
+  const counted  = v(d+'_counted');
+
+  const cashSale = net - lottoreg - card;
+  const expected = cashSale + drop - payouts;
+  const diff     = counted - expected;
+
+  $(d+'_cashsale').textContent = money(cashSale);
+  $(d+'_expected').textContent = money(expected);
+
+  const osEl = $(d+'_os');
+  if (!net && !counted) {
+    osEl.className = 'os-blank'; osEl.textContent = '—';
+  } else if (Math.abs(diff) < 0.005) {
+    osEl.className = 'os-ok';    osEl.textContent = 'OK';
+  } else if (diff > 0) {
+    osEl.className = 'os-over';  osEl.textContent = '+'+money(diff);
+  } else {
+    osEl.className = 'os-short'; osEl.textContent = '–'+money(-diff);
+  }
+
+  calcTotals();
+  updateSummary();
+}
+
+function calcAll() { SHORT.forEach(d => calc(d)); }
+
+function calcTotals() {
+  const fields = ['net','lottoreg','card','cashsale','drop','payouts','expected','counted'];
+  const totals = {};
+  fields.forEach(f => totals[f] = 0);
+
+  SHORT.forEach(d => {
+    totals.net       += v(d+'_net');
+    totals.lottoreg  += v(d+'_lottoreg');
+    totals.card      += v(d+'_card');
+    totals.cashsale  += (v(d+'_net') - v(d+'_lottoreg') - v(d+'_card'));
+    totals.drop      += v(d+'_drop');
+    totals.payouts   += v(d+'_payouts');
+    const exp = (v(d+'_net') - v(d+'_lottoreg') - v(d+'_card')) + v(d+'_drop') - v(d+'_payouts');
+    totals.expected  += exp;
+    totals.counted   += v(d+'_counted');
+  });
+
+  $('TOT_net').textContent     = money(totals.net);
+  $('TOT_lottoreg').textContent= money(totals.lottoreg);
+  $('TOT_card').textContent    = money(totals.card);
+  $('TOT_cashsale').textContent= money(totals.cashsale);
+  $('TOT_drop').textContent    = money(totals.drop);
+  $('TOT_payouts').textContent = money(totals.payouts);
+  $('TOT_expected').textContent= money(totals.expected);
+  $('TOT_counted').textContent = money(totals.counted);
+
+  const totalDiff = totals.counted - totals.expected;
+  const osEl = $('TOT_os');
+  if (!totals.net) {
+    osEl.textContent = '—'; osEl.style.color = '#bbb';
+  } else if (Math.abs(totalDiff) < 0.005) {
+    osEl.textContent = 'OK'; osEl.style.color = '#1a7a1a';
+  } else if (totalDiff > 0) {
+    osEl.textContent = '+'+money(totalDiff); osEl.style.color = '#14538a';
+  } else {
+    osEl.textContent = '–'+money(-totalDiff); osEl.style.color = '#a32020';
+  }
+
+  return totals;
+}
+
+function updateSummary() {
+  const t = calcTotals();
+  const weekDiff = t.counted - t.expected;
+  const avgSale = t.net > 0 ? t.net / SHORT.filter(d => v(d+'_net') > 0).length : 0;
+
+  $('summary').innerHTML = `
+    <div class="stat"><div class="label">Total sales</div><div class="val">${money(t.net)}</div></div>
+    <div class="stat gold"><div class="label">Lottery drop</div><div class="val">${money(t.drop)}</div></div>
+    <div class="stat blue"><div class="label">Card total</div><div class="val">${money(t.card)}</div></div>
+    <div class="stat"><div class="label">Cash payouts</div><div class="val">${money(t.payouts)}</div></div>
+    <div class="stat ${weekDiff > 0.005 ? 'blue' : weekDiff < -0.005 ? 'red' : 'green'}">
+      <div class="label">Week over/short</div>
+      <div class="val">${Math.abs(weekDiff) < 0.005 ? 'EVEN' : (weekDiff > 0 ? '+' : '–') + money(weekDiff)}</div>
+    </div>
+  `;
+}
+
+function saveWeek() {
+  const data = {};
+  SHORT.forEach(d => {
+    data[d] = {
+      net: v(d+'_net'), lottoreg: v(d+'_lottoreg'), card: v(d+'_card'),
+      drop: v(d+'_drop'), payouts: v(d+'_payouts'), counted: v(d+'_counted'),
+      notes: sv(d+'_notes')
+    };
+  });
+  localStorage.setItem(weekKey(currentMonday), JSON.stringify(data));
+  alert('Week saved!');
+}
+
+function loadWeek() {
+  const raw = localStorage.getItem(weekKey(currentMonday));
+  if (!raw) return;
+  try {
+    const data = JSON.parse(raw);
+    SHORT.forEach(d => {
+      if (!data[d]) return;
+      const r = data[d];
+      const setV = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined) el.value = val || ''; };
+      setV(d+'_net',      r.net);
+      setV(d+'_lottoreg', r.lottoreg);
+      setV(d+'_card',     r.card);
+      setV(d+'_drop',     r.drop);
+      setV(d+'_payouts',  r.payouts);
+      setV(d+'_counted',  r.counted);
+      setV(d+'_notes',    r.notes);
+    });
+    calcAll();
+  } catch(e) {}
+}
+
+function clearWeek() {
+  if (!confirm('Clear all entries for this week?')) return;
+  SHORT.forEach(d => {
+    ['net','lottoreg','card','drop','payouts','counted'].forEach(f => {
+      const el = document.getElementById(d+'_'+f); if (el) el.value = '';
+    });
+    const n = document.getElementById(d+'_notes'); if (n) n.value = '';
+    calc(d);
+  });
+}
+
+buildTable();
+loadWeek();
+</script>
+</body>
+</html>
