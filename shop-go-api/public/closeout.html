@@ -259,7 +259,7 @@
     const st = $('lotto_status');
     st.textContent = 'Syncing lottery…'; st.style.color = '#888';
     const isFinal = $('finalshift').value === 'yes';
-    const url = isFinal ? DROP_BASE + '&cumulative=true' : DROP_BASE;
+    const url = isFinal ? DROP_BASE + '&cumulative=true&shifts=99' : DROP_BASE;
     try {
       const r = await fetch(url, {cache:'no-store'});
       const d = await r.json();
