@@ -136,6 +136,47 @@ def _cumulative(shifts_needed):
     }
 
 
+def _debug_info():
+    """Return diagnostic info: server UTC time, Eastern time, and last 5 RTN email dates."""
+    from datetime import datetime, timezone, timedelta
+    import email.utils as eutils
+    ET = timezone(timedelta(hours=-4))
+    now_utc = datetime.now(timezone.utc)
+    now_et = datetime.now(ET)
+    M = _connect()
+    sender = os.environ.get("LOTTERY_SENDER", "admin@realtnetworking.com")
+    _, data = M.search(None, f'(FROM "{sender}")')
+    ids = data[0].split()
+    recent = ids[-5:] if len(ids) >= 5 else ids
+    emails = []
+    for uid in recent:
+        _, msgdata = M.fetch(uid, "(RFC822)")
+        msg = email.message_from_bytes(msgdata[0][1], policy=policy.default)
+        date_hdr = msg.get("Date", "")
+        subject = msg.get("Subject", "")
+        try:
+            ts = eutils.parsedate_to_datetime(date_hdr)
+            ts_et = ts.astimezone(ET)
+            is_today = ts_et.date() == now_et.date()
+        except Exception as ex:
+            ts_et = None
+            is_today = f"parse_error: {ex}"
+        emails.append({
+            "subject": subject,
+            "date_header": date_hdr,
+            "date_eastern": str(ts_et) if ts_et else None,
+            "is_today_eastern": is_today,
+        })
+    M.logout()
+    return {
+        "server_utc": str(now_utc),
+        "server_eastern": str(now_et),
+        "today_eastern": str(now_et.date()),
+        "rtn_email_count": len(ids),
+        "last_5_emails": emails,
+    }
+
+
 class handler(BaseHTTPRequestHandler):
     def _send(self, code, body):
         self.send_response(code)
@@ -157,9 +198,12 @@ class handler(BaseHTTPRequestHandler):
             self._send(403, {"error": "forbidden"})
             return
         cumulative = (qs.get("cumulative") or [""])[0].lower() == "true"
+        debug = (qs.get("debug") or [""])[0].lower() == "true"
         shifts_needed = int((qs.get("shifts") or ["1"])[0])
         try:
-            if cumulative:
+            if debug:
+                self._send(200, _debug_info())
+            elif cumulative:
                 self._send(200, _cumulative(shifts_needed if shifts_needed > 0 else 99))
             else:
                 self._send(200, _latest())
