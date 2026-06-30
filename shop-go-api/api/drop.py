@@ -90,14 +90,15 @@ def _latest():
     return result or {"error": "no PDF in latest email", "subject": msg.get("Subject", "")}
 
 
-def _is_today_eastern(msg_obj):
-    """Return True if the email's Date header falls on today in Eastern time."""
+def _is_recent_eastern(msg_obj):
+    """Return True if the email arrived within the last 30 hours (catches same-day shifts even checked next morning)."""
     from datetime import datetime, timezone, timedelta
     import email.utils as eutils
-    ET = timezone(timedelta(hours=-4))  # EDT; close enough year-round for this use
+    ET = timezone(timedelta(hours=-4))
     try:
         ts = eutils.parsedate_to_datetime(msg_obj.get("Date", ""))
-        return ts.astimezone(ET).date() == datetime.now(ET).date()
+        age = datetime.now(ET) - ts.astimezone(ET)
+        return timedelta(0) <= age <= timedelta(hours=30)
     except Exception:
         return False
 
@@ -114,7 +115,7 @@ def _cumulative(shifts_needed):
     for uid in recent_ids:
         _, msgdata = M.fetch(uid, "(RFC822)")
         raw_msg = email.message_from_bytes(msgdata[0][1], policy=policy.default)
-        if not _is_today_eastern(raw_msg):
+        if not _is_recent_eastern(raw_msg):
             continue
         result = _parse_msg(raw_msg)
         if result and result.get("money_drop") is not None:
@@ -157,15 +158,18 @@ def _debug_info():
         try:
             ts = eutils.parsedate_to_datetime(date_hdr)
             ts_et = ts.astimezone(ET)
-            is_today = ts_et.date() == now_et.date()
+            age_h = (now_et - ts_et).total_seconds() / 3600
+            is_recent = 0 <= age_h <= 30
         except Exception as ex:
             ts_et = None
-            is_today = f"parse_error: {ex}"
+            age_h = None
+            is_recent = f"parse_error: {ex}"
         emails.append({
             "subject": subject,
             "date_header": date_hdr,
             "date_eastern": str(ts_et) if ts_et else None,
-            "is_today_eastern": is_today,
+            "age_hours": round(age_h, 1) if isinstance(age_h, float) else age_h,
+            "passes_filter": is_recent,
         })
     M.logout()
     return {
