@@ -1,0 +1,383 @@
+{
+    "name": "NetNest 01 | LA Solar Permit Miner (daily)",
+    "flow": [
+        {
+            "id": 1,
+            "module": "util:SetVariables",
+            "version": 1,
+            "parameters": {},
+            "mapper": {
+                "variables": [
+                    {
+                        "name": "CFG_SODA_DATASET_URL",
+                        "value": "https://data.lacity.org/resource/pi9x-tg5x.json"
+                    },
+                    {
+                        "name": "CFG_SODA_APP_TOKEN",
+                        "value": "PASTE_YOUR_FREE_SOCRATA_APP_TOKEN_HERE"
+                    },
+                    {
+                        "name": "CFG_LOOKBACK_DAYS",
+                        "value": "7"
+                    },
+                    {
+                        "name": "CFG_MAX_ROWS",
+                        "value": "1000"
+                    },
+                    {
+                        "name": "CFG_WHERE_CLAUSE",
+                        "value": "(upper(work_desc) LIKE '%ROOF%' OR upper(work_desc) LIKE '%SOLAR%' OR upper(work_desc) LIKE '%PHOTOVOLTAIC%')"
+                    },
+                    {
+                        "name": "CFG_ASSESSOR_PORTAL_API",
+                        "value": "https://portal.assessor.lacounty.gov/api/search"
+                    }
+                ],
+                "scope": "roundtrip"
+            },
+            "metadata": {
+                "designer": {
+                    "x": 0,
+                    "y": 0,
+                    "name": "CONFIG — edit me"
+                },
+                "restore": {},
+                "expect": [
+                    {
+                        "name": "variables",
+                        "type": "array",
+                        "label": "Variables"
+                    },
+                    {
+                        "name": "scope",
+                        "type": "select",
+                        "label": "Variable lifetime"
+                    }
+                ]
+            }
+        },
+        {
+            "id": 2,
+            "module": "http:ActionSendData",
+            "version": 3,
+            "parameters": {
+                "handleErrors": true,
+                "useNewZLibDeCompress": true
+            },
+            "mapper": {
+                "url": "{{1.CFG_SODA_DATASET_URL}}",
+                "method": "get",
+                "headers": [
+                    {
+                        "name": "X-App-Token",
+                        "value": "{{1.CFG_SODA_APP_TOKEN}}"
+                    }
+                ],
+                "qs": [
+                    {
+                        "name": "$where",
+                        "value": "issue_date >= '{{formatDate(addDays(now; 0 - 1.CFG_LOOKBACK_DAYS); \"YYYY-MM-DD\")}}' AND {{1.CFG_WHERE_CLAUSE}}"
+                    },
+                    {
+                        "name": "$order",
+                        "value": "issue_date DESC"
+                    },
+                    {
+                        "name": "$limit",
+                        "value": "{{1.CFG_MAX_ROWS}}"
+                    }
+                ],
+                "bodyType": "",
+                "parseResponse": true,
+                "authUser": "",
+                "authPass": "",
+                "timeout": "60",
+                "shareCookies": false,
+                "ca": "",
+                "rejectUnauthorized": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "gzip": true,
+                "useMtls": false,
+                "followAllRedirects": false
+            },
+            "metadata": {
+                "designer": {
+                    "x": 300,
+                    "y": 0,
+                    "name": "GET permits (Socrata SODA API)"
+                }
+            }
+        },
+        {
+            "id": 3,
+            "module": "builtin:BasicFeeder",
+            "version": 1,
+            "parameters": {},
+            "mapper": {
+                "array": "{{2.data}}"
+            },
+            "metadata": {
+                "designer": {
+                    "x": 600,
+                    "y": 0,
+                    "name": "Iterate permits"
+                }
+            }
+        },
+        {
+            "id": 4,
+            "module": "datastore:SearchRecords",
+            "version": 1,
+            "parameters": {
+                "datastore": ""
+            },
+            "mapper": {
+                "filter": [
+                    [
+                        {
+                            "a": "dedupe_key",
+                            "o": "text:equal",
+                            "b": "{{3.pcis_permit}}"
+                        }
+                    ]
+                ],
+                "sort": [],
+                "limit": "1",
+                "continueWhenNoRes": true
+            },
+            "metadata": {
+                "designer": {
+                    "x": 900,
+                    "y": 0,
+                    "name": "Dedupe check (Data Store)"
+                },
+                "notes": "Select your 'LA Leads Master' data store after import. 'Continue the execution of the route even if the module returns no results' must stay ENABLED."
+            }
+        },
+        {
+            "id": 5,
+            "module": "util:SetVariables",
+            "version": 1,
+            "filter": {
+                "name": "New leads only",
+                "conditions": [
+                    [
+                        {
+                            "a": "{{4.dedupe_key}}",
+                            "o": "notexist"
+                        }
+                    ]
+                ]
+            },
+            "parameters": {},
+            "mapper": {
+                "variables": [
+                    {
+                        "name": "lead_id",
+                        "value": "SOLR-{{3.pcis_permit}}"
+                    },
+                    {
+                        "name": "apn",
+                        "value": "{{3.assessor_book}}-{{3.assessor_page}}-{{3.assessor_parcel}}"
+                    },
+                    {
+                        "name": "property_address",
+                        "value": "{{trim(3.address_start + \" \" + 3.street_direction + \" \" + 3.street_name + \" \" + 3.street_suffix)}}"
+                    },
+                    {
+                        "name": "has_existing_solar",
+                        "value": "{{if(contains(upper(3.work_desc); \"SOLAR\") or contains(upper(3.work_desc); \"PHOTOVOLT\"); \"true\"; \"false\")}}"
+                    },
+                    {
+                        "name": "roof_permit_recent",
+                        "value": "{{if(contains(upper(3.work_desc); \"ROOF\"); \"true\"; \"false\")}}"
+                    },
+                    {
+                        "name": "lead_score",
+                        "value": "{{if(contains(upper(3.work_desc); \"ROOF\") and not(contains(upper(3.work_desc); \"SOLAR\")); 65; 15) + if(3.valuation >= 8000; 10; 0) + if(3.permit_type = \"Bldg-Alter/Repair\"; 5; 0)}}"
+                    },
+                    {
+                        "name": "score_reasons",
+                        "value": "{{if(contains(upper(3.work_desc); \"ROOF\") and not(contains(upper(3.work_desc); \"SOLAR\")); \"reroof_permit(+65); \"; \"solar_market_intel(+15); \")}}{{if(3.valuation >= 8000; \"valuation_8k_plus(+10); \"; \"\")}}"
+                    }
+                ],
+                "scope": "roundtrip"
+            },
+            "metadata": {
+                "designer": {
+                    "x": 1200,
+                    "y": 0,
+                    "name": "Score + normalize"
+                }
+            }
+        },
+        {
+            "id": 6,
+            "module": "http:ActionSendData",
+            "version": 3,
+            "parameters": {
+                "handleErrors": true,
+                "useNewZLibDeCompress": true
+            },
+            "mapper": {
+                "url": "{{1.CFG_ASSESSOR_PORTAL_API}}",
+                "method": "get",
+                "headers": [],
+                "qs": [
+                    {
+                        "name": "search",
+                        "value": "{{5.property_address}} {{3.zip_code}}"
+                    }
+                ],
+                "bodyType": "",
+                "parseResponse": true,
+                "authUser": "",
+                "authPass": "",
+                "timeout": "30",
+                "shareCookies": false,
+                "ca": "",
+                "rejectUnauthorized": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "gzip": true,
+                "useMtls": false,
+                "followAllRedirects": false
+            },
+            "metadata": {
+                "designer": {
+                    "x": 1500,
+                    "y": 0,
+                    "name": "Enrich: LA County Assessor portal"
+                },
+                "notes": "Free, unauthenticated JSON endpoint used by portal.assessor.lacounty.gov. Returns Parcels[] with AIN, owner names, situs address, use type. Map extra fields into module 8 as desired."
+            }
+        },
+        {
+            "id": 7,
+            "module": "datastore:AddReplaceRecord",
+            "version": 1,
+            "parameters": {
+                "datastore": ""
+            },
+            "mapper": {
+                "key": "{{3.pcis_permit}}",
+                "overwrite": true,
+                "record": {
+                    "dedupe_key": "{{3.pcis_permit}}",
+                    "lead_id": "{{5.lead_id}}",
+                    "lead_type": "solar",
+                    "source": "ladbs_permit",
+                    "capture_date": "{{now}}",
+                    "full_name": "{{3.applicant_first_name}} {{3.applicant_last_name}}",
+                    "property_address": "{{5.property_address}}",
+                    "zip": "{{3.zip_code}}",
+                    "apn": "{{5.apn}}",
+                    "lead_score": "{{5.lead_score}}",
+                    "status": "new"
+                }
+            },
+            "metadata": {
+                "designer": {
+                    "x": 1800,
+                    "y": 0,
+                    "name": "Save to Data Store"
+                }
+            }
+        },
+        {
+            "id": 8,
+            "module": "google-sheets:addRow",
+            "version": 2,
+            "parameters": {
+                "__IMTCONN__": null
+            },
+            "mapper": {
+                "from": "drive",
+                "mode": "select",
+                "spreadsheetId": "",
+                "sheetId": "Leads",
+                "includesHeaders": true,
+                "insertDataOption": "INSERT_ROWS",
+                "valueInputOption": "USER_ENTERED",
+                "insertUnformatted": false,
+                "values": {
+                    "0": "{{5.lead_id}}",
+                    "1": "solar",
+                    "2": "ladbs_permit",
+                    "3": "{{formatDate(now; \"YYYY-MM-DD\")}}",
+                    "4": "{{3.applicant_first_name}}",
+                    "5": "{{3.applicant_last_name}}",
+                    "6": "{{3.applicant_first_name}} {{3.applicant_last_name}}",
+                    "7": "",
+                    "8": "",
+                    "9": "",
+                    "10": "",
+                    "11": "",
+                    "12": "",
+                    "13": "",
+                    "14": "{{5.property_address}}",
+                    "15": "Los Angeles",
+                    "16": "CA",
+                    "17": "{{3.zip_code}}",
+                    "18": "{{5.apn}}",
+                    "19": "Los Angeles",
+                    "20": "",
+                    "21": "",
+                    "22": "",
+                    "23": "",
+                    "24": "",
+                    "25": "",
+                    "26": "",
+                    "27": "",
+                    "28": "{{3.pcis_permit}}",
+                    "29": "{{3.permit_type}}",
+                    "30": "{{formatDate(3.issue_date; \"YYYY-MM-DD\")}}",
+                    "31": "{{3.work_desc}}",
+                    "32": "{{3.contractors_business_name}}",
+                    "33": "{{3.valuation}}",
+                    "34": "{{5.has_existing_solar}}",
+                    "35": "{{5.roof_permit_recent}}",
+                    "36": "{{5.lead_score}}",
+                    "37": "{{5.score_reasons}}",
+                    "38": "false",
+                    "39": "new",
+                    "40": ""
+                }
+            },
+            "metadata": {
+                "designer": {
+                    "x": 2100,
+                    "y": 0,
+                    "name": "Append to Master Sheet"
+                },
+                "notes": "After import: attach your Google connection, pick your master spreadsheet + 'Leads' tab. Column order matches templates/leads-master-schema.csv."
+            }
+        }
+    ],
+    "metadata": {
+        "instant": false,
+        "version": 1,
+        "scenario": {
+            "roundtrips": 1,
+            "maxErrors": 3,
+            "autoCommit": true,
+            "autoCommitTriggerLast": true,
+            "sequential": false,
+            "slots": null,
+            "confidential": false,
+            "dataloss": false,
+            "dlq": false,
+            "freshVariables": false
+        },
+        "designer": {
+            "orphans": []
+        },
+        "zone": "us1.make.com",
+        "notes": [
+            "SCHEDULE: set this scenario to run once daily (e.g. 07:00 America/Los_Angeles).",
+            "FIELD NAMES: confirm the Socrata column names for your dataset id at https://dev.socrata.com/foundry/data.lacity.org/<dataset-id> and adjust the mappings in modules 3-8 if they differ.",
+            "LA CITY covers ~40% of LA County population. Clone this scenario and point CFG_SODA_DATASET_URL at other city portals (Long Beach, Pasadena, county unincorporated via EPIC-LA) to scale coverage - see docs/scaling-playbook.md."
+        ]
+    }
+}

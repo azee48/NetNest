@@ -1,0 +1,21 @@
+{
+  "name": "LA Leads Master",
+  "description": "Deduplication + canonical record store for the LA County lead scraper. Key every record by dedupe_key: APN for property-based leads, permit number for permit-based leads, or lowercase email for intent leads.",
+  "maxSizeMB": 10,
+  "datastructure": {
+    "name": "LA Lead Record",
+    "spec": [
+      { "name": "dedupe_key", "type": "text", "label": "Dedupe Key (APN | permit# | email)", "required": true },
+      { "name": "lead_id", "type": "text", "label": "Lead ID" },
+      { "name": "lead_type", "type": "text", "label": "Lead Type (solar | fthb | intent)" },
+      { "name": "source", "type": "text", "label": "Source system" },
+      { "name": "capture_date", "type": "date", "label": "Capture Date" },
+      { "name": "full_name", "type": "text", "label": "Full Name / Owner" },
+      { "name": "property_address", "type": "text", "label": "Property Address" },
+      { "name": "zip", "type": "text", "label": "ZIP" },
+      { "name": "apn", "type": "text", "label": "Assessor Parcel Number" },
+      { "name": "lead_score", "type": "number", "label": "Lead Score 0-100" },
+      { "name": "status", "type": "text", "label": "Status (new | enriched | exported | dnc | dead)" }
+    ]
+  }
+}

@@ -1,0 +1,290 @@
+{
+    "name": "NetNest 05 | Weekly CSV Export (Drive + Email)",
+    "flow": [
+        {
+            "id": 1,
+            "module": "util:SetVariables",
+            "version": 1,
+            "parameters": {},
+            "mapper": {
+                "variables": [
+                    {
+                        "name": "CFG_EMAIL_TO",
+                        "value": "nawazaarib@gmail.com"
+                    },
+                    {
+                        "name": "CFG_FILENAME",
+                        "value": "la_leads_{{formatDate(now; \"YYYY-MM-DD\")}}.csv"
+                    }
+                ],
+                "scope": "roundtrip"
+            },
+            "metadata": {
+                "designer": {
+                    "x": 0,
+                    "y": 0,
+                    "name": "CONFIG — edit me"
+                }
+            }
+        },
+        {
+            "id": 2,
+            "module": "google-sheets:searchRows",
+            "version": 2,
+            "parameters": {
+                "__IMTCONN__": null
+            },
+            "mapper": {
+                "from": "drive",
+                "mode": "select",
+                "spreadsheetId": "",
+                "sheetId": "Leads",
+                "includesHeaders": true,
+                "filter": [
+                    [
+                        {
+                            "a": "status",
+                            "o": "text:equal",
+                            "b": "new"
+                        }
+                    ],
+                    [
+                        {
+                            "a": "status",
+                            "o": "text:equal",
+                            "b": "enriched"
+                        }
+                    ]
+                ],
+                "sortOrder": "desc",
+                "orderBy": "lead_score",
+                "valueRenderOption": "FORMATTED_VALUE",
+                "dateTimeRenderOption": "FORMATTED_STRING",
+                "limit": "10000"
+            },
+            "metadata": {
+                "designer": {
+                    "x": 300,
+                    "y": 0,
+                    "name": "Fetch un-exported leads"
+                },
+                "notes": "Pulls every row whose status is 'new' OR 'enriched', sorted best-score-first. After import: attach Google connection + master spreadsheet."
+            }
+        },
+        {
+            "id": 3,
+            "module": "google-sheets:updateRow",
+            "version": 2,
+            "parameters": {
+                "__IMTCONN__": null
+            },
+            "mapper": {
+                "from": "drive",
+                "mode": "select",
+                "spreadsheetId": "",
+                "sheetId": "Leads",
+                "includesHeaders": true,
+                "rowNumber": "{{2.__ROW_NUMBER__}}",
+                "valueInputOption": "USER_ENTERED",
+                "values": {
+                    "39": "exported"
+                }
+            },
+            "metadata": {
+                "designer": {
+                    "x": 600,
+                    "y": 0,
+                    "name": "Mark row exported"
+                }
+            }
+        },
+        {
+            "id": 4,
+            "module": "csv:CreateCSV",
+            "version": 1,
+            "parameters": {
+                "feeder": 2,
+                "delimiter": "comma",
+                "includeHeaders": true,
+                "dataStructure": {
+                    "name": "LA Leads CSV Row",
+                    "spec": [
+                        { "type": "text", "name": "lead_id", "label": "lead_id" },
+                        { "type": "text", "name": "lead_type", "label": "lead_type" },
+                        { "type": "text", "name": "source", "label": "source" },
+                        { "type": "text", "name": "capture_date", "label": "capture_date" },
+                        { "type": "text", "name": "first_name", "label": "first_name" },
+                        { "type": "text", "name": "last_name", "label": "last_name" },
+                        { "type": "text", "name": "full_name", "label": "full_name" },
+                        { "type": "text", "name": "owner_name_raw", "label": "owner_name_raw" },
+                        { "type": "text", "name": "is_llc", "label": "is_llc" },
+                        { "type": "text", "name": "llc_name", "label": "llc_name" },
+                        { "type": "text", "name": "llc_agent_name", "label": "llc_agent_name" },
+                        { "type": "text", "name": "llc_agent_address", "label": "llc_agent_address" },
+                        { "type": "text", "name": "email", "label": "email" },
+                        { "type": "text", "name": "phone", "label": "phone" },
+                        { "type": "text", "name": "property_address", "label": "property_address" },
+                        { "type": "text", "name": "city", "label": "city" },
+                        { "type": "text", "name": "state", "label": "state" },
+                        { "type": "text", "name": "zip", "label": "zip" },
+                        { "type": "text", "name": "apn", "label": "apn" },
+                        { "type": "text", "name": "county", "label": "county" },
+                        { "type": "text", "name": "mailing_address", "label": "mailing_address" },
+                        { "type": "text", "name": "owner_occupied", "label": "owner_occupied" },
+                        { "type": "text", "name": "sale_date", "label": "sale_date" },
+                        { "type": "text", "name": "sale_price", "label": "sale_price" },
+                        { "type": "text", "name": "year_built", "label": "year_built" },
+                        { "type": "text", "name": "sqft", "label": "sqft" },
+                        { "type": "text", "name": "bedrooms", "label": "bedrooms" },
+                        { "type": "text", "name": "bathrooms", "label": "bathrooms" },
+                        { "type": "text", "name": "permit_number", "label": "permit_number" },
+                        { "type": "text", "name": "permit_type", "label": "permit_type" },
+                        { "type": "text", "name": "permit_issue_date", "label": "permit_issue_date" },
+                        { "type": "text", "name": "permit_description", "label": "permit_description" },
+                        { "type": "text", "name": "contractor", "label": "contractor" },
+                        { "type": "text", "name": "permit_valuation", "label": "permit_valuation" },
+                        { "type": "text", "name": "has_existing_solar", "label": "has_existing_solar" },
+                        { "type": "text", "name": "roof_permit_recent", "label": "roof_permit_recent" },
+                        { "type": "text", "name": "lead_score", "label": "lead_score" },
+                        { "type": "text", "name": "score_reasons", "label": "score_reasons" },
+                        { "type": "text", "name": "dnc_checked", "label": "dnc_checked" },
+                        { "type": "text", "name": "status", "label": "status" },
+                        { "type": "text", "name": "notes", "label": "notes" }
+                    ]
+                }
+            },
+            "mapper": {
+                "lead_id": "{{2.lead_id}}",
+                "lead_type": "{{2.lead_type}}",
+                "source": "{{2.source}}",
+                "capture_date": "{{2.capture_date}}",
+                "first_name": "{{2.first_name}}",
+                "last_name": "{{2.last_name}}",
+                "full_name": "{{2.full_name}}",
+                "owner_name_raw": "{{2.owner_name_raw}}",
+                "is_llc": "{{2.is_llc}}",
+                "llc_name": "{{2.llc_name}}",
+                "llc_agent_name": "{{2.llc_agent_name}}",
+                "llc_agent_address": "{{2.llc_agent_address}}",
+                "email": "{{2.email}}",
+                "phone": "{{2.phone}}",
+                "property_address": "{{2.property_address}}",
+                "city": "{{2.city}}",
+                "state": "{{2.state}}",
+                "zip": "{{2.zip}}",
+                "apn": "{{2.apn}}",
+                "county": "{{2.county}}",
+                "mailing_address": "{{2.mailing_address}}",
+                "owner_occupied": "{{2.owner_occupied}}",
+                "sale_date": "{{2.sale_date}}",
+                "sale_price": "{{2.sale_price}}",
+                "year_built": "{{2.year_built}}",
+                "sqft": "{{2.sqft}}",
+                "bedrooms": "{{2.bedrooms}}",
+                "bathrooms": "{{2.bathrooms}}",
+                "permit_number": "{{2.permit_number}}",
+                "permit_type": "{{2.permit_type}}",
+                "permit_issue_date": "{{2.permit_issue_date}}",
+                "permit_description": "{{2.permit_description}}",
+                "contractor": "{{2.contractor}}",
+                "permit_valuation": "{{2.permit_valuation}}",
+                "has_existing_solar": "{{2.has_existing_solar}}",
+                "roof_permit_recent": "{{2.roof_permit_recent}}",
+                "lead_score": "{{2.lead_score}}",
+                "score_reasons": "{{2.score_reasons}}",
+                "dnc_checked": "{{2.dnc_checked}}",
+                "status": "exported",
+                "notes": "{{2.notes}}"
+            },
+            "metadata": {
+                "designer": {
+                    "x": 900,
+                    "y": 0,
+                    "name": "Create CSV (all 41 columns)"
+                }
+            }
+        },
+        {
+            "id": 5,
+            "module": "google-drive:uploadAFile",
+            "version": 4,
+            "parameters": {
+                "__IMTCONN__": null
+            },
+            "mapper": {
+                "select": "value",
+                "destination": "drive",
+                "folderId": "/LA Leads Exports",
+                "title": "{{1.CFG_FILENAME}}",
+                "data": "{{4.text}}",
+                "convert": false
+            },
+            "metadata": {
+                "designer": {
+                    "x": 1200,
+                    "y": 0,
+                    "name": "Upload CSV to Drive"
+                },
+                "notes": "After import: attach Google connection and pick/create your 'LA Leads Exports' folder."
+            }
+        },
+        {
+            "id": 6,
+            "module": "email:ActionSendEmail",
+            "version": 7,
+            "parameters": {
+                "account": null,
+                "saveAfterSent": false
+            },
+            "mapper": {
+                "to": [
+                    "{{1.CFG_EMAIL_TO}}"
+                ],
+                "cc": [],
+                "bcc": [],
+                "subject": "LA Leads Export {{formatDate(now; \"YYYY-MM-DD\")}}",
+                "contentType": "text",
+                "text": "Attached: this week's LA County lead export (first-time buyers + solar).\n\nRows are sorted highest lead_score first. Columns dnc_checked/status tell you what is safe to dial — see docs/compliance.md in the NetNest repo.\n\nGenerated automatically by Make.com scenario 'NetNest 05 | Weekly CSV Export'.",
+                "attachments": [
+                    {
+                        "fileName": "{{1.CFG_FILENAME}}",
+                        "data": "{{4.text}}"
+                    }
+                ]
+            },
+            "metadata": {
+                "designer": {
+                    "x": 1500,
+                    "y": 0,
+                    "name": "Email CSV attachment"
+                },
+                "notes": "After import: attach your email connection (Gmail works). Fix the subject's lead count mapping if you prefer: use the aggregator's bundle count."
+            }
+        }
+    ],
+    "metadata": {
+        "instant": false,
+        "version": 1,
+        "scenario": {
+            "roundtrips": 1,
+            "maxErrors": 3,
+            "autoCommit": true,
+            "autoCommitTriggerLast": true,
+            "sequential": true,
+            "slots": null,
+            "confidential": false,
+            "dataloss": false,
+            "dlq": false,
+            "freshVariables": false
+        },
+        "designer": {
+            "orphans": []
+        },
+        "zone": "us1.make.com",
+        "notes": [
+            "SCHEDULE: weekly (e.g. Monday 08:00 America/Los_Angeles). Run it manually any time you want an on-demand CSV.",
+            "The CSV columns exactly match templates/leads-master-schema.csv, so every export is drop-in compatible with CRM imports.",
+            "Want daily exports? Just change the schedule - the status flag guarantees no lead is exported twice."
+        ]
+    }
+}

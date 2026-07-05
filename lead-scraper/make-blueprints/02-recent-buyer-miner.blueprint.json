@@ -1,0 +1,400 @@
+{
+    "name": "NetNest 02 | LA Recent-Buyer Miner - FTHB scoring (daily)",
+    "flow": [
+        {
+            "id": 1,
+            "module": "util:SetVariables",
+            "version": 1,
+            "parameters": {},
+            "mapper": {
+                "variables": [
+                    {
+                        "name": "CFG_ATTOM_API_KEY",
+                        "value": "PASTE_YOUR_ATTOM_API_KEY_HERE"
+                    },
+                    {
+                        "name": "CFG_ATTOM_SALE_URL",
+                        "value": "https://api.gateway.attomdata.com/propertyapi/v1.0.0/sale/snapshot"
+                    },
+                    {
+                        "name": "CFG_ZIP_LIST",
+                        "value": "90001,90003,90011,90044,90650,91331,91342,90201,90280,90706"
+                    },
+                    {
+                        "name": "CFG_LOOKBACK_DAYS",
+                        "value": "14"
+                    },
+                    {
+                        "name": "CFG_FTHB_MIN_PRICE",
+                        "value": "300000"
+                    },
+                    {
+                        "name": "CFG_FTHB_MAX_PRICE",
+                        "value": "900000"
+                    },
+                    {
+                        "name": "CFG_ASSESSOR_PORTAL_API",
+                        "value": "https://portal.assessor.lacounty.gov/api/search"
+                    }
+                ],
+                "scope": "roundtrip"
+            },
+            "metadata": {
+                "designer": {
+                    "x": 0,
+                    "y": 0,
+                    "name": "CONFIG — edit me"
+                },
+                "notes": "CFG_ZIP_LIST: start with 10 target ZIPs, expand to all ~300 LA County ZIPs as you scale (watch ATTOM plan limits). FTHB price band defaults to entry-level LA pricing - tune it."
+            }
+        },
+        {
+            "id": 2,
+            "module": "builtin:BasicFeeder",
+            "version": 1,
+            "parameters": {},
+            "mapper": {
+                "array": "{{split(1.CFG_ZIP_LIST; \",\")}}"
+            },
+            "metadata": {
+                "designer": {
+                    "x": 300,
+                    "y": 0,
+                    "name": "Iterate target ZIP codes"
+                }
+            }
+        },
+        {
+            "id": 3,
+            "module": "http:ActionSendData",
+            "version": 3,
+            "parameters": {
+                "handleErrors": true,
+                "useNewZLibDeCompress": true
+            },
+            "mapper": {
+                "url": "{{1.CFG_ATTOM_SALE_URL}}",
+                "method": "get",
+                "headers": [
+                    {
+                        "name": "apikey",
+                        "value": "{{1.CFG_ATTOM_API_KEY}}"
+                    },
+                    {
+                        "name": "accept",
+                        "value": "application/json"
+                    }
+                ],
+                "qs": [
+                    {
+                        "name": "postalcode",
+                        "value": "{{trim(2.value)}}"
+                    },
+                    {
+                        "name": "startsalesearchdate",
+                        "value": "{{formatDate(addDays(now; 0 - 1.CFG_LOOKBACK_DAYS); \"YYYY/MM/DD\")}}"
+                    },
+                    {
+                        "name": "endsalesearchdate",
+                        "value": "{{formatDate(now; \"YYYY/MM/DD\")}}"
+                    },
+                    {
+                        "name": "minsaleamt",
+                        "value": "{{1.CFG_FTHB_MIN_PRICE}}"
+                    },
+                    {
+                        "name": "maxsaleamt",
+                        "value": "{{1.CFG_FTHB_MAX_PRICE}}"
+                    },
+                    {
+                        "name": "pagesize",
+                        "value": "100"
+                    }
+                ],
+                "bodyType": "",
+                "parseResponse": true,
+                "authUser": "",
+                "authPass": "",
+                "timeout": "60",
+                "shareCookies": false,
+                "ca": "",
+                "rejectUnauthorized": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "gzip": true,
+                "useMtls": false,
+                "followAllRedirects": false
+            },
+            "metadata": {
+                "designer": {
+                    "x": 600,
+                    "y": 0,
+                    "name": "GET recent sales (ATTOM)"
+                },
+                "notes": "ATTOM offers a free trial key at api.developer.attomdata.com. Swap this module's URL/params for PropertyRadar, BatchData, or Estated if you prefer - the rest of the flow is source-agnostic."
+            }
+        },
+        {
+            "id": 4,
+            "module": "builtin:BasicFeeder",
+            "version": 1,
+            "parameters": {},
+            "mapper": {
+                "array": "{{3.data.property}}"
+            },
+            "metadata": {
+                "designer": {
+                    "x": 900,
+                    "y": 0,
+                    "name": "Iterate sold properties"
+                }
+            }
+        },
+        {
+            "id": 5,
+            "module": "datastore:SearchRecords",
+            "version": 1,
+            "parameters": {
+                "datastore": ""
+            },
+            "mapper": {
+                "filter": [
+                    [
+                        {
+                            "a": "dedupe_key",
+                            "o": "text:equal",
+                            "b": "{{4.identifier.apn}}"
+                        }
+                    ]
+                ],
+                "sort": [],
+                "limit": "1",
+                "continueWhenNoRes": true
+            },
+            "metadata": {
+                "designer": {
+                    "x": 1200,
+                    "y": 0,
+                    "name": "Dedupe check (Data Store)"
+                },
+                "notes": "Select your 'LA Leads Master' data store after import. Keep 'continue when no results' enabled."
+            }
+        },
+        {
+            "id": 6,
+            "module": "util:SetVariables",
+            "version": 1,
+            "filter": {
+                "name": "New leads only",
+                "conditions": [
+                    [
+                        {
+                            "a": "{{5.dedupe_key}}",
+                            "o": "notexist"
+                        }
+                    ]
+                ]
+            },
+            "parameters": {},
+            "mapper": {
+                "variables": [
+                    {
+                        "name": "lead_id",
+                        "value": "FTHB-{{replace(4.identifier.apn; \" \"; \"\")}}"
+                    },
+                    {
+                        "name": "owner_occupied",
+                        "value": "{{if(4.summary.absenteeInd = \"OWNER OCCUPIED\"; \"true\"; \"false\")}}"
+                    },
+                    {
+                        "name": "is_entry_level",
+                        "value": "{{if(4.sale.amount.saleamt <= 1.CFG_FTHB_MAX_PRICE; \"true\"; \"false\")}}"
+                    },
+                    {
+                        "name": "lead_score",
+                        "value": "{{20 + if(4.summary.absenteeInd = \"OWNER OCCUPIED\"; 25; 0) + if(4.sale.amount.saleamt <= 1.CFG_FTHB_MAX_PRICE; 25; 0) + if(4.summary.proptype = \"SFR\" or 4.summary.proptype = \"CONDOMINIUM\"; 15; 0) + if(4.sale.amount.saletranstype = \"Resale\"; 10; 0)}}"
+                    },
+                    {
+                        "name": "score_reasons",
+                        "value": "recent_sale(+20); {{if(4.summary.absenteeInd = \"OWNER OCCUPIED\"; \"owner_occupied(+25); \"; \"\")}}{{if(4.sale.amount.saleamt <= 1.CFG_FTHB_MAX_PRICE; \"entry_level_price(+25); \"; \"\")}}{{if(4.summary.proptype = \"SFR\" or 4.summary.proptype = \"CONDOMINIUM\"; \"sfr_or_condo(+15); \"; \"\")}}"
+                    }
+                ],
+                "scope": "roundtrip"
+            },
+            "metadata": {
+                "designer": {
+                    "x": 1500,
+                    "y": 0,
+                    "name": "FTHB score + normalize"
+                }
+            }
+        },
+        {
+            "id": 7,
+            "module": "http:ActionSendData",
+            "version": 3,
+            "parameters": {
+                "handleErrors": true,
+                "useNewZLibDeCompress": true
+            },
+            "mapper": {
+                "url": "{{1.CFG_ASSESSOR_PORTAL_API}}",
+                "method": "get",
+                "headers": [],
+                "qs": [
+                    {
+                        "name": "search",
+                        "value": "{{4.address.line1}} {{4.address.postal1}}"
+                    }
+                ],
+                "bodyType": "",
+                "parseResponse": true,
+                "authUser": "",
+                "authPass": "",
+                "timeout": "30",
+                "shareCookies": false,
+                "ca": "",
+                "rejectUnauthorized": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "gzip": true,
+                "useMtls": false,
+                "followAllRedirects": false
+            },
+            "metadata": {
+                "designer": {
+                    "x": 1800,
+                    "y": 0,
+                    "name": "Enrich: LA County Assessor (owner name, exemptions)"
+                },
+                "notes": "Pulls current owner-of-record + homeowner exemption from the county assessor portal API. A newly-filed homeowner exemption on a recent sale is a strong owner-occupier confirmation."
+            }
+        },
+        {
+            "id": 8,
+            "module": "datastore:AddReplaceRecord",
+            "version": 1,
+            "parameters": {
+                "datastore": ""
+            },
+            "mapper": {
+                "key": "{{4.identifier.apn}}",
+                "overwrite": true,
+                "record": {
+                    "dedupe_key": "{{4.identifier.apn}}",
+                    "lead_id": "{{6.lead_id}}",
+                    "lead_type": "fthb",
+                    "source": "attom_sale",
+                    "capture_date": "{{now}}",
+                    "full_name": "",
+                    "property_address": "{{4.address.line1}}",
+                    "zip": "{{4.address.postal1}}",
+                    "apn": "{{4.identifier.apn}}",
+                    "lead_score": "{{6.lead_score}}",
+                    "status": "new"
+                }
+            },
+            "metadata": {
+                "designer": {
+                    "x": 2100,
+                    "y": 0,
+                    "name": "Save to Data Store"
+                }
+            }
+        },
+        {
+            "id": 9,
+            "module": "google-sheets:addRow",
+            "version": 2,
+            "parameters": {
+                "__IMTCONN__": null
+            },
+            "mapper": {
+                "from": "drive",
+                "mode": "select",
+                "spreadsheetId": "",
+                "sheetId": "Leads",
+                "includesHeaders": true,
+                "insertDataOption": "INSERT_ROWS",
+                "valueInputOption": "USER_ENTERED",
+                "insertUnformatted": false,
+                "values": {
+                    "0": "{{6.lead_id}}",
+                    "1": "fthb",
+                    "2": "attom_sale",
+                    "3": "{{formatDate(now; \"YYYY-MM-DD\")}}",
+                    "4": "",
+                    "5": "",
+                    "6": "",
+                    "7": "",
+                    "8": "",
+                    "9": "",
+                    "10": "",
+                    "11": "",
+                    "12": "",
+                    "13": "",
+                    "14": "{{4.address.line1}}",
+                    "15": "{{4.address.locality}}",
+                    "16": "CA",
+                    "17": "{{4.address.postal1}}",
+                    "18": "{{4.identifier.apn}}",
+                    "19": "Los Angeles",
+                    "20": "",
+                    "21": "{{6.owner_occupied}}",
+                    "22": "{{4.sale.salesearchdate}}",
+                    "23": "{{4.sale.amount.saleamt}}",
+                    "24": "{{4.summary.yearbuilt}}",
+                    "25": "{{4.building.size.universalsize}}",
+                    "26": "{{4.building.rooms.beds}}",
+                    "27": "{{4.building.rooms.bathstotal}}",
+                    "28": "",
+                    "29": "",
+                    "30": "",
+                    "31": "",
+                    "32": "",
+                    "33": "",
+                    "34": "",
+                    "35": "",
+                    "36": "{{6.lead_score}}",
+                    "37": "{{6.score_reasons}}",
+                    "38": "false",
+                    "39": "new",
+                    "40": "owner name: fill from module 7 assessor response after first test run"
+                }
+            },
+            "metadata": {
+                "designer": {
+                    "x": 2400,
+                    "y": 0,
+                    "name": "Append to Master Sheet"
+                },
+                "notes": "After import: attach Google connection + pick master spreadsheet. After your first test run, open module 7's output and map OwnerNames/mailing address into columns 6/7/20."
+            }
+        }
+    ],
+    "metadata": {
+        "instant": false,
+        "version": 1,
+        "scenario": {
+            "roundtrips": 1,
+            "maxErrors": 3,
+            "autoCommit": true,
+            "autoCommitTriggerLast": true,
+            "sequential": false,
+            "slots": null,
+            "confidential": false,
+            "dataloss": false,
+            "dlq": false,
+            "freshVariables": false
+        },
+        "designer": {
+            "orphans": []
+        },
+        "zone": "us1.make.com",
+        "notes": [
+            "SCHEDULE: run once daily after 01 Solar Permit Miner (e.g. 07:30 America/Los_Angeles).",
+            "WHY THIS FINDS FIRST-TIME BUYERS: entry-level price band + owner-occupied + SFR/condo + resale purchase is the standard public-records FTHB proxy. True pre-purchase FTHB intent leads come in through scenario 04's webhook (ads/forms); this scenario supplies the just-purchased segment.",
+            "ATTOM 'AllEvents' or 'Expanded Profile' endpoints add buyer names + FHA loan-type flags (FHA purchase = very strong FTHB signal) on higher plan tiers - see docs/scaling-playbook.md."
+        ]
+    }
+}
